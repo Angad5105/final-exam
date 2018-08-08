@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/5.3.1/firebase.js"></script>
+  <script>
+    // Initialize Firebase
+    var config = {
+    apiKey: "AIzaSyDCkKOsMOU9edLgQBDlVilaUoUG1RwD8Uo",
+    authDomain: "final-exam-55d52.firebaseapp.com",
+    databaseURL: "https://final-exam-55d52.firebaseio.com",
+    projectId: "final-exam-55d52",
+    storageBucket: "final-exam-55d52.appspot.com",
+    messagingSenderId: "93049226245"
+  };
+  firebase.initializeApp(config);
+
+    $(function(){
+      const imageTableRef = firebase.database().ref('/image_table');
+      const storageRef = firebase.storage();
+      let uploader = document.getElementById('progressBar');
+
+      $('#form1').submit(function(event){
+        event.preventDefault();
+
+        let img_url = $('#img_url_input').val();
+        let img_caption = $('#caption_input').val();
+
+        imageTableRef.push({ url: img_url,
+                            caption: img_caption,
+                            source: "url" });
+      });
+
+      $('#form2').submit(function(event){
+        event.preventDefault();
+        let file = $('#img_file').get(0).files[0];
+        let img_caption_2 = $('#caption_input_2').val();
+        // for metadata in storage
+        const name = file.name;
+        const metadata = { contentType: file.type };
+        // Setup storage: Change ###RULE### in Firebase Storage to be public
+        // as the following
+
+        // service firebase.storage {
+        //   match /b/{bucket}/o {
+        //     match /{allPaths=**} {
+        //       allow read, write;
+        //     }
+        //   }
+        // }
+
+        // point to location of firebase         VV  foldername     VV  name of file to display in firebase
+        let storageLocation =  storageRef.ref('upload_image/' + file.name);
+
+        // Actual opertation of upload
+        let uploadImg = storageLocation.put(file,metadata);
+
+        // waiting for the response from the firebase 3 status: in progress, error, and complete
+        uploadImg.on('state_changed',
+          function progress(snapshot){
+            console.log("Uploading..");
+            // this is a fancy progress bar don't mind it
+            let per = (snapshot.bytesTransferred / snapshot.totalBytes) *100;
+            uploader.value = per;
+          },
+
+          function error(error){
+            console.log("Upload error");
+          },
+
+          function complete(){
+            console.log("Upload Completed");
+            // when complete we need to get the url of the image which we just uploaded
+            // cannot do outside this Complete block otherwise we cannot get the URL
+            // get storage URL
+            storageLocation.getDownloadURL().then(function(storage_url) {
+              console.log("return URL: " + storage_url);
+              let uploadURL = storage_url;
+              // insert information to image table in the same database as above
+              imageTableRef.push({
+                url: uploadURL,
+                caption: img_caption_2,
+                source: "file"
+              });
+            });
+          }
+        ); //storage upload end here.
+      });
+
+      imageTableRef.on('child_added', function(data){
+        const imageId = data.key;
+        const imageObj = data.val();
+
+        let image_url = imageObj.url;
+        let image_caption = imageObj.caption;
+        let image_source = imageObj.source;
+
+        let imageTag = `
+                        <article id="${imageId}">
+                          <img src="${image_url}" alt="" />
+                          <p>${image_caption}</p>
+                          <button>Delete</button>
+                        </article>
+        `;
+
+        $('button').unbind().click(function(event) {
+         $(this).parent().fadeOut(function() {
+         let buttonId = $(this).attr('imageId');
+
+         firebase.database().ref(`image_table/${buttonId}`).remove();
+         });
+       });
+        if(image_source == "url"){
+          $('#gallery1').prepend(imageTag);
+        }
+        else{
+          $('#gallery2').prepend(imageTag);
+        }
+      });
+
+      $(document).ready(function(){
+      $("button").click(function(){
+          $("#imageId").remove();
+      });
+  });
+
+    });
+
+  </script>
+  <title>IMAGLY</title>
+</head>
+<body>
+  <header>
+    <div class="robin">
+    <img src="robin.png" alt="logo">
+      <h1>IMAGLY</h1>
+      </div>
+  </header>
+<main>
+  <div class="container">
+  <h2>Insert image as a url</h2>
+  <div id="input-form-1">
+    <form id="form1" action="">
+      <div class="form-group">
+        <label>Image URL:</label>
+        <input id="img_url_input" class="form-control" type="text">
+        <br>
+        <label>Caption:</label>
+        <input id="caption_input" class="form-control" type="text">
+        <br>
+
+        <input class="btn btn-success" type="submit">
+      </div>
+    </form>
+  </div>
+  <h2>Gallery</h2>
+  <div id="gallery1" class="images">
+    <span class="close">&times;</span>
+
+
+  </div>
+
+  </div>
+
+  <div>
+    <h2>News</h2>
+
+    <ul class="list">
+      <li>I ate an apple</li>
+      <li>It was tasty</li>
+      <li>Image are great</li>
+      <li>I like cat images</li>
+    </ul>
+  </div>
+
+  </main>
+
+
+
+</body>
+</html>
